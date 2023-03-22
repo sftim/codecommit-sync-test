@@ -1,0 +1,45 @@
+---
+name: 'CodeCommit sync'
+env:
+  AWS_REGION: eu-west-1
+  iam_role_arn: arn:aws:iam::272066579046:role/synctest # timtesting_one
+  REPOSITORY_NAME_REMOTE: synctest
+on:
+  push:
+    branches: [ main ]
+    paths:
+    - '**/*'
+    # next line just for ease of testing
+    - '!.github/workflows/codecommit-sync.yml' # this file
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for workflow trigger'
+        required: true
+        default: 'Manual sync'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for authentication to AWS
+      contents: read  # Required for code sync (read source)
+    steps:
+    - name: Check out
+      uses: actions/checkout@v3
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        role-to-assume: ${{ env.iam_role_arn }}
+        role-session-name: ${{ github.sha }}
+        aws-region: ${{ env.AWS_REGION }}
+    - name: Sync to CodeCommit
+      id: sync
+      run: |
+          code_commit_url="https://git-codecommit.${AWS_REGION}.amazonaws.com/v1/repos/${REPOSITORY_NAME_REMOTE}"
+          git config --global --add safe.directory /github/workspace
+          git config --global credential.'https://git-codecommit.*.amazonaws.com'.helper '!aws codecommit credential-helper $@'
+          git config --global credential.UseHttpPath true
+          git remote add sync "${code_commit_url}"
+          git push sync main:main
+          git push sync --mirror
