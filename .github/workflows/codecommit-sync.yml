@@ -42,5 +42,5 @@ jobs:
           git config --global credential.UseHttpPath true
           git remote add sync "${code_commit_url}"
           git fetch sync main
-          git push sync main:main
+          git push sync main:main --force-with-lease
           git push sync --mirror
